@@ -8,42 +8,354 @@ library community.livecode.trevordevore.masshortcut
   metadata author is "Trevor DeVore"
   metadata version is "0.0.1"
 
-  private foreign handler ObjC_MASShortcutKeyCode(in pNSObject as ObjcId) \
+  private foreign handler Objc_MASShortcutKeyCode(in pNSObject as ObjcId) \
         returns CULong binds to "objc:MASShortcut>MASShortcut.-keyCode"
-  private foreign handler ObjC_MASShortcutKeyCodeString(in pNSObject as ObjcId) \
+  private foreign handler Objc_MASShortcutKeyCodeString(in pNSObject as ObjcId) \
         returns ObjcId binds to "objc:MASShortcut>MASShortcut.-keyCodeString"
-  private foreign handler ObjC_MASShortcutModifierFlags(in pNSObject as ObjcId) \
+  private foreign handler Objc_MASShortcutModifierFlags(in pNSObject as ObjcId) \
         returns CULong binds to "objc:MASShortcut>MASShortcut.-modifierFlags"
-  private foreign handler ObjC_MASShortcutModifierFlagsString(in pNSObject as ObjcId) \
+  private foreign handler Objc_MASShortcutModifierFlagsString(in pNSObject as ObjcId) \
         returns ObjcId binds to "objc:MASShortcut>MASShortcut.-modifierFlagsString"
 
-  private foreign handler ObjC_MASShortcutInitWithKeyCode(in keyCode as CULong, in modFlags as CULong) \
+  private foreign handler Objc_MASShortcutInitWithKeyCode(in keyCode as CULong, in modFlags as CULong) \
         returns ObjcId binds to "objc:MASShortcut>MASShortcut.-initWithKeyCode:modifierFlags:"
-  private foreign handler ObjC_MASShortcutShortcutWithKeyCode(in keyCode as CULong, in modFlags as CULong) \
+  private foreign handler Objc_MASShortcutShortcutWithKeyCode(in keyCode as CULong, in modFlags as CULong) \
         returns ObjcId binds to "objc:MASShortcut>MASShortcut.+shortcutWithKeyCode:modifierFlags:"
 
   private handler type BindShortcutWithDefaultsKeyBlock() returns nothing
 
-  private foreign handler ObjC_MASShortcutBinderSharedBinder() \
+  private foreign handler Objc_MASShortcutBinderSharedBinder() \
         returns ObjcId binds to "objc:MASShortcut>MASShortcutBinder.+sharedBinder"
-  private foreign handler ObjC_MASShortcutBinderBindShortcutWithDefaultsKey(in pObject as ObjcId, in defaultsKeyNameNSString as ObjcId, in pAction as BindShortcutWithDefaultsKeyBlock) \
+  private foreign handler Objc_MASShortcutBinderBindShortcutWithDefaultsKey(in pObject as ObjcId, in defaultsKeyNameNSString as ObjcId, in pAction as BindShortcutWithDefaultsKeyBlock) \
         returns nothing binds to "objc:MASShortcut>MASShortcutBinder.-bindShortcutWithDefaultsKey:toAction:"
+  private foreign handler Objc_MASShortcutBinderBreakBindingWithDefaultsKey(in pObject as ObjcId, in defaultsKeyNameNSString as ObjcId) \
+        returns nothing binds to "objc:MASShortcut>MASShortcutBinder.-breakBindingWithDefaultsKey:"
 
 
-  private variable mShortCut as optional ObjcObject
-  private variable mShortcutView as optional ObjcObject
-  private variable mView as optional ObjcObject
   private variable mSharedBinder as optional ObjcObject
 
-  public handler masshortcutSetDefaultsKey(in pKey as String) returns nothing
+  /**
+  Summary: Installs a callback every time the short cut stored in a defaults (prefs) key is triggered.
+
+  Description:
+  When callback block is triggered we need way of identifying which defaultskey it is associated with.
+  */
+  public handler masshortcutInstallCallbackForDefaultsKey(in pDefaultsKey as String) returns nothing
     unsafe
-      put ObjC_MASShortcutBinderSharedBinder() into mSharedBinder
-      ObjC_MASShortcutBinderBindShortcutWithDefaultsKey(mSharedBinder, StringToNSString(pKey), ShortcutActionCallback)
+      put Objc_MASShortcutBinderSharedBinder() into mSharedBinder
+      Objc_MASShortcutBinderBindShortcutWithDefaultsKey(mSharedBinder, StringToNSString(pDefaultsKey), ShortcutActionCallback)
     end unsafe
+  end handler
+
+
+  /**
+  Summary: Removes a callback that was being sent every time the short cut stored in a defaults (prefs) key was triggered.
+  */
+  public handler masshortcutRemoveCallbackForDefaultsKey(in pDefaultsKey as String) returns nothing
+    unsafe
+      put Objc_MASShortcutBinderSharedBinder() into mSharedBinder
+      Objc_MASShortcutBinderBreakBindingWithDefaultsKey(mSharedBinder, StringToNSString(pDefaultsKey))
+    end unsafe
+  end handler
+
+
+  public handler masshortcutCreateShortcut(in pIdentifier as String, in pKeyCodeConstant as String, in pModifierFlagConstants as String) returns nothing
+    // Create new shortcut
+    variable tShortcut as optional ObjcObject
+
+    // Combine pModifierFlagConstants using bitwise or
+
+    // Register block callback. We need some way of sending context so we know which shortcut was triggered.
+
+    // Register callback with MASShortcutMonitor -registerShortcut
+
+    // Store tShortcut in list or array of shortcuts
+  end handler
+
+
+  public handler masshortcutRemoveShortcut(in pIdentifier as String) returns nothing
+    // code...
   end handler
 
 
   handler ShortcutActionCallback() returns nothing
     log "ShortcutActionCallback"
+  end handler
+
+  /*
+  Returns the virtual keycode value for a constant.
+
+  https://github.com/phracker/MacOSX-SDKs/blob/master/MacOSX10.6.sdk/System/Library/Frameworks/Carbon.framework/Versions/A/Frameworks/HIToolbox.framework/Versions/A/Headers/Events.h
+  */
+  private handler _VirtualKeyCodes(in pKey as String) returns Integer
+    if pKey is "kVK_ANSI_A" then
+      return 0x00
+    else if pKey is "kVK_ANSI_S" then
+      return 0x01
+    else if pKey is "kVK_ANSI_D" then
+      return 0x02
+    else if pKey is "kVK_ANSI_F" then
+      return 0x03
+    else if pKey is "kVK_ANSI_H" then
+      return 0x04
+    else if pKey is "kVK_ANSI_G" then
+      return 0x05
+    else if pKey is "kVK_ANSI_Z" then
+      return 0x06
+    else if pKey is "kVK_ANSI_X" then
+      return 0x07
+    else if pKey is "kVK_ANSI_C" then
+      return 0x08
+    else if pKey is "kVK_ANSI_V" then
+      return 0x09
+    else if pKey is "kVK_ANSI_B" then
+      return 0x0B
+    else if pKey is "kVK_ANSI_Q" then
+      return 0x0C
+    else if pKey is "kVK_ANSI_W" then
+      return 0x0D
+    else if pKey is "kVK_ANSI_E" then
+      return 0x0E
+    else if pKey is "kVK_ANSI_R" then
+      return 0x0F
+    else if pKey is "kVK_ANSI_Y" then
+      return 0x10
+    else if pKey is "kVK_ANSI_T" then
+      return 0x11
+    else if pKey is "kVK_ANSI_1" then
+      return 0x12
+    else if pKey is "kVK_ANSI_2" then
+      return 0x13
+    else if pKey is "kVK_ANSI_3" then
+      return 0x14
+    else if pKey is "kVK_ANSI_4" then
+      return 0x15
+    else if pKey is "kVK_ANSI_6" then
+      return 0x16
+    else if pKey is "kVK_ANSI_5" then
+      return 0x17
+    else if pKey is "kVK_ANSI_Equal" then
+      return 0x18
+    else if pKey is "kVK_ANSI_9" then
+      return 0x19
+    else if pKey is "kVK_ANSI_7" then
+      return 0x1A
+    else if pKey is "kVK_ANSI_Minus" then
+      return 0x1B
+    else if pKey is "kVK_ANSI_8" then
+      return 0x1C
+    else if pKey is "kVK_ANSI_0" then
+      return 0x1D
+    else if pKey is "kVK_ANSI_RightBracket" then
+      return 0x1E
+    else if pKey is "kVK_ANSI_O" then
+      return 0x1F
+    else if pKey is "kVK_ANSI_U" then
+      return 0x20
+    else if pKey is "kVK_ANSI_LeftBracket" then
+      return 0x21
+    else if pKey is "kVK_ANSI_I" then
+      return 0x22
+    else if pKey is "kVK_ANSI_P" then
+      return 0x23
+    else if pKey is "kVK_ANSI_L" then
+      return 0x25
+    else if pKey is "kVK_ANSI_J" then
+      return 0x26
+    else if pKey is "kVK_ANSI_Quote" then
+      return 0x27
+    else if pKey is "kVK_ANSI_K" then
+      return 0x28
+    else if pKey is "kVK_ANSI_Semicolon" then
+      return 0x29
+    else if pKey is "kVK_ANSI_Backslash" then
+      return 0x2A
+    else if pKey is "kVK_ANSI_Comma" then
+      return 0x2B
+    else if pKey is "kVK_ANSI_Slash" then
+      return 0x2C
+    else if pKey is "kVK_ANSI_N" then
+      return 0x2D
+    else if pKey is "kVK_ANSI_M" then
+      return 0x2E
+    else if pKey is "kVK_ANSI_Period" then
+      return 0x2F
+    else if pKey is "kVK_ANSI_Grave" then
+      return 0x32
+    else if pKey is "kVK_ANSI_KeypadDecimal" then
+      return 0x41
+    else if pKey is "kVK_ANSI_KeypadMultiply" then
+      return 0x43
+    else if pKey is "kVK_ANSI_KeypadPlus" then
+      return 0x45
+    else if pKey is "kVK_ANSI_KeypadClear" then
+      return 0x47
+    else if pKey is "kVK_ANSI_KeypadDivide" then
+      return 0x4B
+    else if pKey is "kVK_ANSI_KeypadEnter" then
+      return 0x4C
+    else if pKey is "kVK_ANSI_KeypadMinus" then
+      return 0x4E
+    else if pKey is "kVK_ANSI_KeypadEquals" then
+      return 0x51
+    else if pKey is "kVK_ANSI_Keypad0" then
+      return 0x52
+    else if pKey is "kVK_ANSI_Keypad1" then
+      return 0x53
+    else if pKey is "kVK_ANSI_Keypad2" then
+      return 0x54
+    else if pKey is "kVK_ANSI_Keypad3" then
+      return 0x55
+    else if pKey is "kVK_ANSI_Keypad4" then
+      return 0x56
+    else if pKey is "kVK_ANSI_Keypad5" then
+      return 0x57
+    else if pKey is "kVK_ANSI_Keypad6" then
+      return 0x58
+    else if pKey is "kVK_ANSI_Keypad7" then
+      return 0x59
+    else if pKey is "kVK_ANSI_Keypad8" then
+      return 0x5B
+    else if pKey is "kVK_ANSI_Keypad9" then
+      return 0x5C
+    else if pKey is "kVK_Return" then
+      return 0x24
+    else if pKey is "kVK_Tab" then
+      return 0x30
+    else if pKey is "kVK_Space" then
+      return 0x31
+    else if pKey is "kVK_Delete" then
+      return 0x33
+    else if pKey is "kVK_Escape" then
+      return 0x35
+    else if pKey is "kVK_Command" then
+      return 0x37
+    else if pKey is "kVK_Shift" then
+      return 0x38
+    else if pKey is "kVK_CapsLock" then
+      return 0x39
+    else if pKey is "kVK_Option" then
+      return 0x3A
+    else if pKey is "kVK_Control" then
+      return 0x3B
+    else if pKey is "kVK_RightShift" then
+      return 0x3C
+    else if pKey is "kVK_RightOption" then
+      return 0x3D
+    else if pKey is "kVK_RightControl" then
+      return 0x3E
+    else if pKey is "kVK_Function" then
+      return 0x3F
+    else if pKey is "kVK_F17" then
+      return 0x40
+    else if pKey is "kVK_VolumeUp" then
+      return 0x48
+    else if pKey is "kVK_VolumeDown" then
+      return 0x49
+    else if pKey is "kVK_Mute" then
+      return 0x4A
+    else if pKey is "kVK_F18" then
+      return 0x4F
+    else if pKey is "kVK_F19" then
+      return 0x50
+    else if pKey is "kVK_F20" then
+      return 0x5A
+    else if pKey is "kVK_F5" then
+      return 0x60
+    else if pKey is "kVK_F6" then
+      return 0x61
+    else if pKey is "kVK_F7" then
+      return 0x62
+    else if pKey is "kVK_F3" then
+      return 0x63
+    else if pKey is "kVK_F8" then
+      return 0x64
+    else if pKey is "kVK_F9" then
+      return 0x65
+    else if pKey is "kVK_F11" then
+      return 0x67
+    else if pKey is "kVK_F13" then
+      return 0x69
+    else if pKey is "kVK_F16" then
+      return 0x6A
+    else if pKey is "kVK_F14" then
+      return 0x6B
+    else if pKey is "kVK_F10" then
+      return 0x6D
+    else if pKey is "kVK_F12" then
+      return 0x6F
+    else if pKey is "kVK_F15" then
+      return 0x71
+    else if pKey is "kVK_Help" then
+      return 0x72
+    else if pKey is "kVK_Home" then
+      return 0x73
+    else if pKey is "kVK_PageUp" then
+      return 0x74
+    else if pKey is "kVK_ForwardDelete" then
+      return 0x75
+    else if pKey is "kVK_F4" then
+      return 0x76
+    else if pKey is "kVK_End" then
+      return 0x77
+    else if pKey is "kVK_F2" then
+      return 0x78
+    else if pKey is "kVK_PageDown" then
+      return 0x79
+    else if pKey is "kVK_F1" then
+      return 0x7A
+    else if pKey is "kVK_LeftArrow" then
+      return 0x7B
+    else if pKey is "kVK_RightArrow" then
+      return 0x7C
+    else if pKey is "kVK_DownArrow" then
+      return 0x7D
+    else if pKey is "kVK_UpArrow" then
+      return 0x7E
+    else if pKey is "kVK_ISO_Section" then
+      return 0x0A
+    else if pKey is "kVK_JIS_Yen" then
+      return 0x5D
+    else if pKey is "kVK_JIS_Underscore" then
+      return 0x5E
+    else if pKey is "kVK_JIS_KeypadComma" then
+      return 0x5F
+    else if pKey is "kVK_JIS_Eisu" then
+      return 0x66
+    else if pKey is "kVK_JIS_Kana" then
+      return 0x68
+    else
+      return 0
+    end if
+  end handler
+
+  /**
+  Summary: Returns the bitshifted value for constants.
+
+  Description:
+  https://github.com/thezerobit/gnustep-gui-sony/blob/master/Headers/AppKit/NSEvent.h
+
+  Note that these were deprecated in 10.12.
+  */
+  private handler _ModifierKeyMasks(in pKey as String) returns Integer
+    if pKey is "NSAlphaShiftKeyMask" then
+      return 1 shifted left by 16 bitwise
+    else if pKey is "NSShiftKeyMask" then
+      return 2 shifted left by 16 bitwise
+    else if pKey is "NSControlKeyMask" then
+      return 4 shifted left by 16 bitwise
+    else if pKey is "NSAlternateKeyMask" then
+      return 8 shifted left by 16 bitwise
+    else if pKey is "NSCommandKeyMask" then
+      return 16 shifted left by 16 bitwise
+    else if pKey is "NSNumericPadKeyMask" then
+      return 32 shifted left by 16 bitwise
+    else if pKey is "NSHelpKeyMask" then
+      return 64 shifted left by 16 bitwise
+    else if pKey is "NSFunctionKeyMask" then
+      return 128 shifted left by 16 bitwise
+    else // "default"
+      return 0
+    end if
   end handler
 end library
