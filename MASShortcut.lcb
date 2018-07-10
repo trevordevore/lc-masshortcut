@@ -30,10 +30,14 @@ widget community.livecode.trevordevore.masshortcut
         returns ObjcId binds to "objc:MASShortcut>MASShortcutView.-init"
   private foreign handler ObjC_MASShortcutActivateEventMonitoring(in pView as ObjcId, in shouldActivate as CBool) \
         returns nothing binds to "objc:MASShortcut>MASShortcutView.-activateEventMonitoring:"
+  private foreign handler ObjC_MASShortcutAssociatedUserDefaultsKey(in pView as ObjcId, in userDefaultsKeyNSString as ObjcId) \
+        returns nothing binds to "objc:MASShortcut>MASShortcutView.-setAssociatedUserDefaultsKey:"
+
+  private handler type BindShortcutWithDefaultsKeyBlock() returns nothing
 
   private foreign handler ObjC_MASShortcutBinderSharedBinder() \
         returns ObjcId binds to "objc:MASShortcut>MASShortcutBinder.+sharedBinder"
-  private foreign handler ObjC_MASShortcutBinderBindShortcutWithDefaultsKey(in pObject as ObjcId, in defaultsKeyNameNSString as ObjcId, in pAction as ObjcId) \
+  private foreign handler ObjC_MASShortcutBinderBindShortcutWithDefaultsKey(in pObject as ObjcId, in defaultsKeyNameNSString as ObjcId, in pAction as BindShortcutWithDefaultsKeyBlock) \
         returns nothing binds to "objc:MASShortcut>MASShortcutBinder.-bindShortcutWithDefaultsKey:toAction:"
 
 
@@ -41,7 +45,6 @@ widget community.livecode.trevordevore.masshortcut
   private variable mShortcutView as optional ObjcObject
   private variable mView as optional ObjcObject
   private variable mSharedBinder as optional ObjcObject
-  private variable mShortcutBlock as optional ObjcObject
 
   public handler monitorForEvent() returns nothing
     unsafe
@@ -58,7 +61,7 @@ widget community.livecode.trevordevore.masshortcut
   end handler
 
 
-  private handler ShortcutActionCallback(in pSender as ObjcObject, in pContext as optional any) returns nothing
+  handler ShortcutActionCallback() returns nothing
     log "ShortcutActionCallback"
   end handler
 
@@ -72,15 +75,13 @@ widget community.livecode.trevordevore.masshortcut
       CreateView()
 
       put ObjC_MASShortcutBinderSharedBinder() into mSharedBinder
-      put ObjcProxyGetTarget(ShortcutActionCallback, nothing) into mShortcutBlock
-      ObjC_MASShortcutBinderBindShortcutWithDefaultsKey(mSharedBinder, StringToNSString("MASShortcutTest"), mShortcutBlock)
+      -- ObjC_MASShortcutBinderBindShortcutWithDefaultsKey(mSharedBinder, StringToNSString("MASShortcutTest"), ShortcutActionCallback)
     end unsafe
   end handler
 
   public handler OnClose()
     unsafe
       DestroyView()
-      put nothing into mShortcutBlock
     end unsafe
   end handler
 
@@ -88,10 +89,12 @@ widget community.livecode.trevordevore.masshortcut
     variable tView as ObjcObject
     put ObjC_MASShortcutViewAlloc() into tView
     put ObjC_MASShortcutViewInit(tView) into tView
+    ObjC_MASShortcutAssociatedUserDefaultsKey(tView, StringToNSString("MASShortcutTest"))
 
     set my native layer to PointerFromObjcObject(tView)
     put tView into mView
   end handler
+
 
   private unsafe handler DestroyView()
     set my native layer to nothing
