@@ -1,0 +1,182 @@
+widget community.livecode.trevordevore.masshortcutinput
+
+  use com.livecode.foreign
+  use com.livecode.objc
+  use com.livecode.engine
+  use com.livecode.widget
+  use com.livecode.canvas
+
+  metadata title is "MASShortcut Input"
+  metadata author is "Trevor DeVore"
+  metadata version is "0.0.1"
+
+  property defaultsKey get getDefaultsKey set setDefaultsKey
+  property isRecording get getIsRecording
+  property shortcutKeyString get getShortcutKeyString
+  property shortcutModifierString get getShortcutModifierString
+
+  variable mProperties as Array
+
+  private foreign handler Objc_MASShortcutViewAlloc () \
+        returns ObjcRetainedId binds to "objc:MASShortcut>MASShortcutView.+alloc"
+  private foreign handler Objc_MASShortcutViewInit(in pObj as ObjcId) \
+        returns ObjcId binds to "objc:MASShortcut>MASShortcutView.-init"
+  private foreign handler Objc_MASShortcutViewAssociatedUserDefaultsKey(in pView as ObjcId, in userDefaultsKeyNSString as ObjcId) \
+        returns nothing binds to "objc:MASShortcut>MASShortcutView.-setAssociatedUserDefaultsKey:"
+
+  private foreign handler Objc_MASShortcutViewShortcutValue (in pView as ObjcId) \
+        returns ObjcId binds to "objc:MASShortcut>MASShortcutView.-shortcutValue"
+  private foreign handler Objc_MASShortcutViewIsRecording (in pView as ObjcId) \
+        returns CBool binds to "objc:MASShortcut>MASShortcutView.-isRecording"
+  private foreign handler Objc_MASShortcutViewIsEnabled (in pView as ObjcId) \
+        returns CBool binds to "objc:MASShortcut>MASShortcutView.-isEnabled"
+
+  private foreign handler Objc_MASShortcutKeyCodeString(in pNSObject as ObjcId) \
+        returns ObjcId binds to "objc:MASShortcut>MASShortcut.-keyCodeString"
+  private foreign handler Objc_MASShortcutModifierFlagsString(in pNSObject as ObjcId) \
+        returns ObjcId binds to "objc:MASShortcut>MASShortcut.-modifierFlagsString"
+
+  private variable mView as optional ObjcObject
+
+
+  private handler getDefaultsKey() returns String
+    if "defaultsKey"  is among the keys of mProperties then
+      return mProperties["defaultsKey"]
+    else
+      return ""
+    end if
+  end handler
+
+
+  private handler setDefaultsKey(in pKey as String) returns nothing
+    put pKey into mProperties["defaultsKey"]
+    _UpdateDefaultsKey()
+  end handler
+
+
+  private handler getShortcutKeyString() returns String
+    variable tShortcut as optional ObjcObject
+    variable tString as String
+
+    if mView is not nothing then
+      unsafe
+        put Objc_MASShortcutViewShortcutValue(mView) into tShortcut
+        if tShortcut is not nothing then
+          put StringFromNSString(Objc_MASShortcutKeyCodeString(tShortcut)) into tString
+        end if
+      end unsafe
+    end if
+
+    return tString
+  end handler
+
+
+  private handler getShortcutModifierString() returns String
+    variable tShortcut as optional ObjcObject
+    variable tString as String
+
+    if mView is not nothing then
+      unsafe
+        put Objc_MASShortcutViewShortcutValue(mView) into tShortcut
+        if tShortcut is not nothing then
+          put StringFromNSString(Objc_MASShortcutModifierFlagsString(tShortcut)) into tString
+        end if
+      end unsafe
+    end if
+
+    return tString
+  end handler
+
+
+  private handler getIsRecording() returns Boolean
+    variable tBoolean as Boolean
+
+    if mView is not nothing then
+      unsafe
+        put Objc_MASShortcutViewIsRecording(mView) into tBoolean
+      end unsafe
+    else
+      put false into tBoolean
+    end if
+
+    return tBoolean
+  end handler
+
+
+  private handler getIsEnabled() returns Boolean
+    variable tBoolean as Boolean
+
+    if mView is not nothing then
+      unsafe
+        put Objc_MASShortcutViewIsEnabled(mView) into tBoolean
+      end unsafe
+    else
+      put false into tBoolean
+    end if
+
+    return tBoolean
+  end handler
+
+
+  private handler _UpdateDefaultsKey() returns nothing
+    if mView is not empty and mProperties["defaultsKey"] is not empty then
+      unsafe
+        Objc_MASShortcutViewAssociatedUserDefaultsKey(mView, StringToNSString(mProperties["defaultsKey"]))
+      end unsafe
+    end if
+  end handler
+
+
+  public handler OnCreate()
+    put the empty array into mProperties
+    put "MASShortcutTest" into mProperties["defaultsKey"]
+  end handler
+
+
+  public handler OnLoad(in pProperties as Array)
+    put pProperties into mProperties
+  end handler
+
+
+  public handler OnSave(out rProperties as Array)
+    put mProperties into rProperties
+  end handler
+
+
+  public handler OnDestroy()
+    put nothing into mView
+  end handler
+
+
+  public handler OnOpen()
+    unsafe
+      CreateView()
+    end unsafe
+  end handler
+
+
+  public handler OnClose()
+    unsafe
+      DestroyView()
+    end unsafe
+  end handler
+
+
+  private unsafe handler CreateView()
+    variable tView as ObjcObject
+
+    put Objc_MASShortcutViewAlloc() into tView
+    put Objc_MASShortcutViewInit(tView) into tView
+
+    set my native layer to PointerFromObjcObject(tView)
+    put tView into mView
+
+    _UpdateDefaultsKey()
+  end handler
+
+
+  private unsafe handler DestroyView()
+    set my native layer to nothing
+    put nothing into mView
+  end handler
+end widget

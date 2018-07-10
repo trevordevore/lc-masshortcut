@@ -1,0 +1,49 @@
+library community.livecode.trevordevore.masshortcut
+
+  use com.livecode.foreign
+  use com.livecode.objc
+  use com.livecode.engine
+
+  metadata title is "MASShortcut"
+  metadata author is "Trevor DeVore"
+  metadata version is "0.0.1"
+
+  private foreign handler ObjC_MASShortcutKeyCode(in pNSObject as ObjcId) \
+        returns CULong binds to "objc:MASShortcut>MASShortcut.-keyCode"
+  private foreign handler ObjC_MASShortcutKeyCodeString(in pNSObject as ObjcId) \
+        returns ObjcId binds to "objc:MASShortcut>MASShortcut.-keyCodeString"
+  private foreign handler ObjC_MASShortcutModifierFlags(in pNSObject as ObjcId) \
+        returns CULong binds to "objc:MASShortcut>MASShortcut.-modifierFlags"
+  private foreign handler ObjC_MASShortcutModifierFlagsString(in pNSObject as ObjcId) \
+        returns ObjcId binds to "objc:MASShortcut>MASShortcut.-modifierFlagsString"
+
+  private foreign handler ObjC_MASShortcutInitWithKeyCode(in keyCode as CULong, in modFlags as CULong) \
+        returns ObjcId binds to "objc:MASShortcut>MASShortcut.-initWithKeyCode:modifierFlags:"
+  private foreign handler ObjC_MASShortcutShortcutWithKeyCode(in keyCode as CULong, in modFlags as CULong) \
+        returns ObjcId binds to "objc:MASShortcut>MASShortcut.+shortcutWithKeyCode:modifierFlags:"
+
+  private handler type BindShortcutWithDefaultsKeyBlock() returns nothing
+
+  private foreign handler ObjC_MASShortcutBinderSharedBinder() \
+        returns ObjcId binds to "objc:MASShortcut>MASShortcutBinder.+sharedBinder"
+  private foreign handler ObjC_MASShortcutBinderBindShortcutWithDefaultsKey(in pObject as ObjcId, in defaultsKeyNameNSString as ObjcId, in pAction as BindShortcutWithDefaultsKeyBlock) \
+        returns nothing binds to "objc:MASShortcut>MASShortcutBinder.-bindShortcutWithDefaultsKey:toAction:"
+
+
+  private variable mShortCut as optional ObjcObject
+  private variable mShortcutView as optional ObjcObject
+  private variable mView as optional ObjcObject
+  private variable mSharedBinder as optional ObjcObject
+
+  public handler masshortcutSetDefaultsKey(in pKey as String) returns nothing
+    unsafe
+      put ObjC_MASShortcutBinderSharedBinder() into mSharedBinder
+      ObjC_MASShortcutBinderBindShortcutWithDefaultsKey(mSharedBinder, StringToNSString(pKey), ShortcutActionCallback)
+    end unsafe
+  end handler
+
+
+  handler ShortcutActionCallback() returns nothing
+    log "ShortcutActionCallback"
+  end handler
+end library
