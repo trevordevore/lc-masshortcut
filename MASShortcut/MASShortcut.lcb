@@ -8,6 +8,54 @@ library community.livecode.trevordevore.masshortcut
   metadata author is "Trevor DeVore"
   metadata version is "0.0.1"
 
+  /**
+  START BLOCK
+  **/
+  public foreign type BlockDescriptor binds to "MCAggregateTypeInfo:ffrrr"
+  public foreign type Block binds to "MCAggregateTypeInfo:rEErr"
+
+  private handler type ShortcutPressedBlock(in pContext as Pointer) returns nothing
+
+  foreign handler CopyBlockDescriptor(inout pBlock as BlockDescriptor, in pSize as UIntSize, out rNewBlock as Pointer) returns CBool binds to "MCMemoryAllocateCopy"
+  foreign handler MCHandlerGetFunctionPtr(in pBlockCallback as ShortcutPressedBlock, out rPtr as Pointer) returns CBool binds to "<builtin>"
+  foreign handler CopyBlock(inout pBlock as Block, in pSize as UIntSize, out rNewBlock as Pointer) returns nothing binds to "MCMemoryAllocateCopy"
+  foreign handler MCMemoryDelete(in pBlock as Pointer) returns nothing binds to "<builtin>"
+
+  constant kBlockSize is 32
+  constant kBlockDescriptorSize is 40
+
+  private handler CreateFunctionBlock(in pFunction as any, out rBlockPtr as Pointer, out rBlockDescriptorPointer as Pointer) returns nothing
+    variable tBlock as Block
+    variable tBlockDescriptor as BlockDescriptor
+
+    put [0,kBlockSize,nothing,nothing,nothing] into tBlockDescriptor
+
+    unsafe
+      CopyBlockDescriptor(tBlockDescriptor, kBlockDescriptorSize, rBlockDescriptorPointer)
+
+      variable tInvokePointer as Pointer
+      MCHandlerGetFunctionPtr(pFunction, tInvokePointer)
+      put [nothing,0,0,tInvokePointer,rBlockDescriptorPointer] into tBlock
+
+      CopyBlock(tBlock, kBlockSize, rBlockPtr)
+    end unsafe
+  end handler
+
+
+  private handler DeleteFunctionBlock(in pBlockPtr as Pointer, in pBlockDescriptorPointer as Pointer) returns nothing
+    unsafe
+      MCMemoryDelete(pBlockPtr)
+      MCMemoryDelete(pBlockDescriptorPointer)
+    end unsafe
+  end handler
+
+  public handler ShortcutActionCallback(in pContext as Pointer) returns nothing
+    log "ShortcutActionCallback"
+  end handler
+  /**
+  END BLOCK
+  **/
+
   private foreign handler Objc_MASShortcutKeyCode(in pNSObject as ObjcId) \
         returns CULong binds to "objc:MASShortcut>MASShortcut.-keyCode"
   private foreign handler Objc_MASShortcutKeyCodeString(in pNSObject as ObjcId) \
@@ -22,17 +70,53 @@ library community.livecode.trevordevore.masshortcut
   private foreign handler Objc_MASShortcutShortcutWithKeyCode(in keyCode as CULong, in modFlags as CULong) \
         returns ObjcId binds to "objc:MASShortcut>MASShortcut.+shortcutWithKeyCode:modifierFlags:"
 
-  private handler type BindShortcutWithDefaultsKeyBlock() returns nothing
+  private foreign handler Objc_MASShortcutMonitorSharedMonitor() \
+        returns ObjcId binds to "objc:MASShortcut>MASShortcutMonitor.+sharedMonitor"
+  private foreign handler Objc_MASShortcutMonitorRegisterShortcut(in pMonitor as ObjcId, in pShortcut as ObjcId, in pAction as Pointer) \
+        returns CBool binds to "objc:MASShortcut>MASShortcutMonitor.-registerShortcut:withAction:"
+  private foreign handler Objc_MASShortcutMonitorUnregisterShortcut(in pMonitor as ObjcId, in pShortcut as ObjcId) \
+        returns nothing binds to "objc:MASShortcut>MASShortcutMonitor.-unregisterShortcut:"
+  private foreign handler Objc_MASShortcutMonitorIsShortcutRegistered(in pMonitor as ObjcId, in pShortcut as ObjcId) \
+        returns CBool binds to "objc:MASShortcut>MASShortcutMonitor.-isShortcutRegistered:"
+  private foreign handler Objc_MASShortcutMonitorUnregisterAllShortcuts(in pMonitor as ObjcId) \
+        returns nothing binds to "objc:MASShortcut>MASShortcutMonitor.-unregisterAllShortcuts"
 
   private foreign handler Objc_MASShortcutBinderSharedBinder() \
         returns ObjcId binds to "objc:MASShortcut>MASShortcutBinder.+sharedBinder"
-  private foreign handler Objc_MASShortcutBinderBindShortcutWithDefaultsKey(in pObject as ObjcId, in defaultsKeyNameNSString as ObjcId, in pAction as BindShortcutWithDefaultsKeyBlock) \
+  private foreign handler Objc_MASShortcutBinderBindShortcutWithDefaultsKey(in pObject as ObjcId, in defaultsKeyNameNSString as ObjcId, in pAction as Pointer) \
         returns nothing binds to "objc:MASShortcut>MASShortcutBinder.-bindShortcutWithDefaultsKey:toAction:"
   private foreign handler Objc_MASShortcutBinderBreakBindingWithDefaultsKey(in pObject as ObjcId, in defaultsKeyNameNSString as ObjcId) \
         returns nothing binds to "objc:MASShortcut>MASShortcutBinder.-breakBindingWithDefaultsKey:"
 
 
+  private variable mSharedMonitor as optional ObjcObject
   private variable mSharedBinder as optional ObjcObject
+  private variable mBlocks as Array
+
+  public handler masshortcutInitialize() returns nothing
+    put the empty array into mBlocks
+    unsafe
+      put Objc_MASShortcutMonitorSharedMonitor() into mSharedMonitor
+      put Objc_MASShortcutBinderSharedBinder() into mSharedBinder
+    end unsafe
+  end handler
+
+
+  public handler masshortcutCleanup() returns nothing
+    variable tBlock as List
+
+    -- element 1 is tBlockPtr, element 2 is tBlockDescriptorPointer
+    repeat for each element tBlock in mBlocks
+      DeleteFunctionBlock(element 1 of tBlock, element 2 of tBlock)
+    end repeat
+
+    unsafe
+      Objc_MASShortcutMonitorUnregisterAllShortcuts(mSharedMonitor)
+    end unsafe
+
+    put nothing into mSharedMonitor
+    put nothing into mSharedBinder
+  end handler
 
   /**
   Summary: Installs a callback every time the short cut stored in a defaults (prefs) key is triggered.
@@ -42,8 +126,13 @@ library community.livecode.trevordevore.masshortcut
   */
   public handler masshortcutInstallCallbackForDefaultsKey(in pDefaultsKey as String) returns nothing
     unsafe
-      put Objc_MASShortcutBinderSharedBinder() into mSharedBinder
-      Objc_MASShortcutBinderBindShortcutWithDefaultsKey(mSharedBinder, StringToNSString(pDefaultsKey), ShortcutActionCallback)
+      variable tBlockPtr as Pointer
+      variable tBlockDescriptionPointer as Pointer
+
+      CreateFunctionBlock(ShortcutActionCallback, tBlockPtr, tBlockDescriptionPointer)
+      put [tBlockPtr, tBlockDescriptionPointer] into mBlocks[pDefaultsKey]
+
+      Objc_MASShortcutBinderBindShortcutWithDefaultsKey(mSharedBinder, StringToNSString(pDefaultsKey), tBlockPtr)
     end unsafe
   end handler
 
@@ -60,16 +149,43 @@ library community.livecode.trevordevore.masshortcut
 
 
   public handler masshortcutCreateShortcut(in pIdentifier as String, in pKeyCodeConstant as String, in pModifierFlagConstants as String) returns nothing
-    // Create new shortcut
-    variable tShortcut as optional ObjcObject
+    variable tFlags as List
+    variable tFlag as String
+    variable tModFlags as Integer
 
     // Combine pModifierFlagConstants using bitwise or
+    split pModifierFlagConstants by "," into tFlags
 
-    // Register block callback. We need some way of sending context so we know which shortcut was triggered.
+    repeat for each element tFlag in tFlags
+      put tModFlags bitwise or _ModifierKeyMasks(tFlag) into tModFlags
+    end repeat
 
-    // Register callback with MASShortcutMonitor -registerShortcut
+    // Create new shortcut
+    variable tShortcut as optional ObjcObject
+    unsafe
+      put Objc_MASShortcutShortcutWithKeyCode(_VirtualKeyCodes(pKeyCodeConstant), tModFlags) into tShortcut
+    end unsafe
 
-    // Store tShortcut in list or array of shortcuts
+    if tShortcut is not nothing then
+      unsafe
+        // MASShortcut comments say that you should not register a shortcut twice
+        if Objc_MASShortcutMonitorIsShortcutRegistered(mSharedMonitor, tShortcut) then
+          Objc_MASShortcutMonitorUnregisterShortcut(mSharedMonitor, tShortcut)
+        end if
+      end unsafe
+
+      // Create block callback
+      variable tBlockPtr as Pointer
+      variable tBlockDescriptionPointer as Pointer
+      variable tRegistered as Boolean
+
+      CreateFunctionBlock(ShortcutActionCallback, tBlockPtr, tBlockDescriptionPointer)
+      put [tBlockPtr, tBlockDescriptionPointer] into mBlocks[pIdentifier]
+
+      unsafe
+        put Objc_MASShortcutMonitorRegisterShortcut(mSharedMonitor, tShortcut, tBlockPtr) into tRegistered
+      end unsafe
+    end if
   end handler
 
 
@@ -77,10 +193,6 @@ library community.livecode.trevordevore.masshortcut
     // code...
   end handler
 
-
-  handler ShortcutActionCallback() returns nothing
-    log "ShortcutActionCallback"
-  end handler
 
   /*
   Returns the virtual keycode value for a constant.
